@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Post</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Create a New Post</h1>
+        <form action="/create" method="post">
+            <label for="title">Title:</label>
+            <input type="text" id="title" name="title" required>
+            <label for="content">Content:</label>
+            <textarea id="content" name="content" required></textarea>
+            <label for="media">Upload Media (Image, Video, or GIF):</label>
+            <input type="file" id="media" name="media">
+            <div>
+                <label for="media_type">Select Media Type (if uploaded):</label><br>
+                <input type="radio" id="image" name="media_type" value="image">
+                <label for="image">Image</label><br>
+                <input type="radio" id="video" name="media_type" value="video">
+                <label for="video">Video</label><br>
+                <input type="radio" id="gif" name="media_type" value="gif">
+                <label for="gif">GIF</label><br>
+            </div>
+            <label for="categories">Categories:</label>
+            <select id="categories" name="categories" multiple>
+                <option value="1">Technology</option>
+                <option value="2">Science</option>
+                <option value="3">Art</option>
+                <option value="4">Sports</option>
+                <option value="5">Religion</option>
+                <option value="6">Education</option>
+                <option value="7">Entertainment</option>
+            </select>
+            <button type="submit">Create Post</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('createPostForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch('/posts/create', {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            });
+            if (response.ok) {
+                alert('Post created successfully!');
+                window.location.href = '/posts/filter';
+            } else {
+                alert('Failed to create post.');
+            }
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+    // Filter posts by category
+    document.getElementById("filterButton").addEventListener("click", function () {
+        const categoryId = document.getElementById("categoryFilter").value;
+        fetch(`/posts/filter?type=category&value=${categoryId}`)
+            .then(response => response.json())
+            .then(posts => {
+                const postsList = document.getElementById("postsList");
+                postsList.innerHTML = "";
+                posts.forEach(post => {
+                    const postDiv = document.createElement("div");
+                    postDiv.className = "post";
+                    postDiv.innerHTML = `
+                        <h3>${post.title}</h3>
+                        <p>${post.content}</p>
+                        <p>Posted by ${post.username} on ${new Date(post.created_at).toLocaleString()}</p>
+                        <a href="/posts/${post.id}">View Details</a>
+                    `;
+                    postsList.appendChild(postDiv);
+                });
+            });
+    });
+
+    // Create a new post
+    document.getElementById("createPostForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        const title = document.getElementById("postTitle").value;
+        const content = document.getElementById("postContent").value;
+        const categories = Array.from(document.getElementById("postCategories").selectedOptions).map(option => option.value);
+
+        fetch("/posts/create", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ title, content, categories }),
+        })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+                window.location.reload();
+            });
+    });
+
+    // Like or dislike a post
+    document.getElementById("likeButton")?.addEventListener("click", function () {
+        const postId = window.location.pathname.split("/").pop();
+        fetch("/likes-dislikes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ targetID: postId, targetType: "post", action: "like" }),
+        })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+                window.location.reload();
+            });
+    });
+
+    document.getElementById("dislikeButton")?.addEventListener("click", function () {
+        const postId = window.location.pathname.split("/").pop();
+        fetch("/likes-dislikes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ targetID: postId, targetType: "post", action: "dislike" }),
+        })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+                window.location.reload();
+            });
+    });
+
+    // Create a new comment
+    document.getElementById("createCommentForm")?.addEventListener("submit", function (e) {
+        e.preventDefault();
+        const content = document.getElementById("commentContent").value;
+        const postId = window.location.pathname.split("/").pop();
+
+        fetch("/comments/create", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ postID: postId, content }),
+        })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+                window.location.reload();
+            });
+    });
+});
+    </script>
+</body>
+
+</html>

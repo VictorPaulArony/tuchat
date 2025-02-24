@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Posts</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .post {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .post h2 {
+            margin-top: 0;
+        }
+
+        .post img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+        }
+
+        .actions {
+            margin-top: 10px;
+        }
+
+        .actions button {
+            margin-right: 10px;
+        }
+        .media-container {
+    margin: 1rem 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.post-media {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Create a New Post</h1>
+        <form id="createPostForm" action="/create" method="POST" enctype="multipart/form-data">
+            <label for="title">Title:</label>
+            <input type="text" id="title" name="title" required>
+            <label for="content">Content:</label>
+            <textarea id="content" name="content" required></textarea>
+            <label for="media">Upload Media (Image, Video, or GIF):</label>
+            <input type="file" id="media" name="media" accept=".jpg,.jpeg,.png,.gif,.mp4,.mov,.webm">
+            <div class="form-group">
+                <label for="categories">Categories:</label>
+                <div class="category-group">
+                    {{range .Categories}}
+                    <div class="category-option">
+                        <input type="checkbox" id="cat-{{.ID}}" name="categories" value="{{.ID}}">
+                        <label for="cat-{{.ID}}">{{.Name}}</label>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+
+            <button type="submit">Create Post</button>
+        </form>
+    </div>
+    <hr>
+    {{range .Posts}}
+    <div class="post">
+        <h2>{{.Title}}</h2>
+        <p>{{.Content}}</p>
+        <p><small>by {{.Username}}</small></p>
+         <!-- Display categories -->
+         <div class="categories">
+            Categories: 
+            {{range .Categories}}
+                <span class="category-tag">{{.Name}}</span>
+            {{end}}
+        </div>
+        <!-- {{if .Media}}
+        <img src="data:image/JPG;base64,{{.Media}}" alt="Post Media">
+        {{end}} -->
+        {{if .Media}}
+        <div class="media-container">
+            {{if or (eq .ContentType "image/jpeg") (eq .ContentType "image/png") (eq .ContentType "image/gif")}}
+                <img src="data:{{.ContentType}};base64,{{.Media}}" alt="Post image" class="post-media">
+            {{else if or (eq .ContentType "video/mp4") (eq .ContentType "video/quicktime") (eq .ContentType "video/webm")}}
+                <video controls class="post-media">
+                    <source src="data:{{.ContentType}};base64,{{.Media}}" type="{{.ContentType}}">
+                    Your browser does not support the video tag.
+                </video>
+            {{end}}
+        </div>
+    {{end}}
+        <p>{{.Category}}</p>
+
+        <!-- Like & Dislike Form -->
+        <form class="like-form" action="/likes" method="POST">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <input type="hidden" name="item_type" value="post">
+            <button type="submit" name="type" value="like">
+                👍 Like (<span id="like-count-post-{{.ID}}">{{.Likes}}</span>)
+            </button>
+            <button type="submit" name="type" value="dislike">
+                👎 Dislike (<span id="dislike-count-post-{{.ID}}">{{.Dislikes}}</span>)
+            </button>
+        </form>
+
+        <!-- Comment Form -->
+        <form action="/comments" method="POST" class="comment-form" id="comments-{{.ID}}">
+            <input type="hidden" name="post_id" value="{{.ID}}">
+            <input type="text" name="content" placeholder="Add a comment">
+            <button type="submit">💬 Comment</button>
+        </form>
+
+        <!-- <p>Total Comments: <span id="comment-count-{{.ID}}">{{.Comments}}</span></p> -->
+        {{range .Comments}}
+        <div class="comment">
+            <p>{{.Content}}</p>
+            <p><small>Posted on {{.CreatedAt}}</small></p>
+
+            <!-- Comment Like & Dislike Form -->
+            <form class="like-form" action="/likes" method="POST">
+                <input type="hidden" name="id" value="{{.ID}}">
+                <input type="hidden" name="item_type" value="comment">
+                <button type="submit" name="type" value="like">
+                    👍 Like (<span id="like-count-comment-{{.ID}}">{{.Likes}}</span>)
+                </button>
+                <button type="submit" name="type" value="dislike">
+                    👎 Dislike (<span id="dislike-count-comment-{{.ID}}">{{.Dislikes}}</span>)
+                </button>
+            </form>
+        </div>
+        {{end}}
+
+        <hr>
+    </div>
+    {{end}}
+    <hr>
+
+    <script>
+
+        // Handle post creation form submission
+        document.getElementById('createPostForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch('/create', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                alert('Post created successfully!');
+                window.location.href = '/posts';
+            } else if (response.status === 401) {
+                alert('Failed to create post: user not logged in.');
+            } else {
+                alert('Failed to create post.');
+            }
+        });
+
+        // Handle like/dislike form submissions
+        // Like/dislike handler for both posts and comments
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.like-form').forEach(form => {
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+
+                    const formData = new URLSearchParams();
+                    formData.append('id', event.target.querySelector('input[name="id"]').value);
+                    formData.append('item_type', event.target.querySelector('input[name="item_type"]').value);
+                    formData.append('type', event.submitter.value);
+
+                    try {
+                        const response = await fetch('/likes', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            //error handling for easy debugging of the code
+                            const itemType = event.target.querySelector('input[name="item_type"]').value;
+                            const itemId = event.target.querySelector('input[name="id"]').value;
+                            const countSpan = document.getElementById(`${event.submitter.value}-count-${itemType}-${itemId}`);
+
+                            if (countSpan) {
+                                const currentCount = parseInt(countSpan.textContent);
+                                // countSpan.textContent = currentCount + 1;
+                                window.location.reload()
+                            }
+                        } else if (response.status === 401) {
+                            window.location.href = '/login';
+                        } else {
+                            const errorText = await response.text();
+                            console.error('Error:', errorText);
+                            alert('Failed to process like/dislike');
+                        }
+                    } catch (error) {
+                        console.error('Request failed:', error);
+                        alert('Failed to process request');
+                    }
+                });
+            });
+        });
+
+        // Handle comment form submissions
+        document.querySelectorAll('.comment-form').forEach(form => {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const formData = new URLSearchParams(new FormData(event.target));
+
+                try {
+                    const response = await fetch('/comments', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        alert('Comment created successfully');
+                        window.location.reload();
+                    } else if (response.status === 401) {
+                        alert('Failed to comment: user not logged in.');
+                        window.location.href = '/login';
+                    } else {
+                        alert('Failed to comment.');
+                    }
+                } catch (error) {
+                    console.error('Request failed:', error);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
