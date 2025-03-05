@@ -55,6 +55,7 @@ func LikeHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    fmt.Println("ok ")
     w.WriteHeader(http.StatusOK)
     w.Write([]byte("liked/disliked created successfully"))
 }
