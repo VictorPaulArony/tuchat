@@ -5,153 +5,189 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Posts</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <style>
-        .post {
-            border: 1px solid #ccc;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
+    <link rel="stylesheet" href="/static/posts.css">
 
-        .post h2 {
-            margin-top: 0;
-        }
-
-        .post img {
-            max-width: 100%;
-            height: auto;
-            margin-top: 10px;
-        }
-
-        .actions {
-            margin-top: 10px;
-        }
-
-        .actions button {
-            margin-right: 10px;
-        }
-        .media-container {
-    margin: 1rem 0;
-    max-width: 100%;
-    overflow: hidden;
-}
-
-.post-media {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-}
-    </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>Create a New Post</h1>
-        <form id="createPostForm" action="/create" method="POST" enctype="multipart/form-data">
-            <label for="title">Title:</label>
-            <input type="text" id="title" name="title" required>
-            <label for="content">Content:</label>
-            <textarea id="content" name="content" required></textarea>
-            <label for="media">Upload Media (Image, Video, or GIF):</label>
-            <input type="file" id="media" name="media" accept=".jpg,.jpeg,.png,.gif,.mp4,.mov,.webm">
-            <div class="form-group">
-                <label for="categories">Categories:</label>
-                <div class="category-group">
-                    {{range .Categories}}
-                    <div class="category-option">
-                        <input type="checkbox" id="cat-{{.ID}}" name="categories" value="{{.ID}}">
-                        <label for="cat-{{.ID}}">{{.Name}}</label>
+        <div class="createpost-container">
+            <h1>Create a New Post</h1>
+            <form id="createPostForm" action="/create" method="POST" enctype="multipart/form-data">
+                <label for="title">Title:</label>
+                <input type="text" id="title" name="title" required>
+                <label for="content">Content:</label>
+                <textarea id="content" name="content" required></textarea>
+                <label for="media">Upload Media (Image, Video, or GIF):</label>
+                <input type="file" id="media" name="media" accept=".jpg,.jpeg,.png,.gif,.mp4,.mov,.webm">
+                <div class="form-group">
+                    <label for="categories">Categories:</label>
+                    <div class="category-group">
+                        {{range .Categories}}
+                        <div class="category-option">
+                            <input type="checkbox" id="cat-{{.ID}}" name="categories" value="{{.ID}}">
+                            <label for="cat-{{.ID}}">{{.Name}}</label>
+                        </div>
+                        {{end}}
                     </div>
-                    {{end}}
                 </div>
-            </div>
 
-            <button type="submit">Create Post</button>
-        </form>
-    </div>
-    <hr>
-    {{range .Posts}}
-    <div class="post">
-        <h2>{{.Title}}</h2>
-        <p>{{.Content}}</p>
-        <p><small>by {{.Username}}</small></p>
-         <!-- Display categories -->
-         <div class="categories">
-            Categories: 
-            {{range .Categories}}
-                <span class="category-tag">{{.Name}}</span>
-            {{end}}
-        </div>
-        <!-- {{if .Media}}
-        <img src="data:image/JPG;base64,{{.Media}}" alt="Post Media">
-        {{end}} -->
-        {{if .Media}}
-        <div class="media-container">
-            {{if or (eq .ContentType "image/jpeg") (eq .ContentType "image/png") (eq .ContentType "image/gif")}}
-                <img src="data:{{.ContentType}};base64,{{.Media}}" alt="Post image" class="post-media">
-            {{else if or (eq .ContentType "video/mp4") (eq .ContentType "video/quicktime") (eq .ContentType "video/webm")}}
-                <video controls class="post-media">
-                    <source src="data:{{.ContentType}};base64,{{.Media}}" type="{{.ContentType}}">
-                    Your browser does not support the video tag.
-                </video>
-            {{end}}
-        </div>
-    {{end}}
-        <p>{{.Category}}</p>
-
-        <!-- Like & Dislike Form -->
-        <form class="like-form" action="/likes" method="POST">
-            <input type="hidden" name="id" value="{{.ID}}">
-            <input type="hidden" name="item_type" value="post">
-            <button type="submit" name="type" value="like">
-                👍 Like (<span id="like-count-post-{{.ID}}">{{.Likes}}</span>)
-            </button>
-            <button type="submit" name="type" value="dislike">
-                👎 Dislike (<span id="dislike-count-post-{{.ID}}">{{.Dislikes}}</span>)
-            </button>
-        </form>
-
-        <!-- Comment Form -->
-        <form action="/comments" method="POST" class="comment-form" id="comments-{{.ID}}">
-            <input type="hidden" name="post_id" value="{{.ID}}">
-            <input type="text" name="content" placeholder="Add a comment">
-            <button type="submit">💬 Comment</button>
-        </form>
-
-        <!-- <p>Total Comments: <span id="comment-count-{{.ID}}">{{.Comments}}</span></p> -->
-        {{range .Comments}}
-        <div class="comment">
-            <p>{{.Content}}</p>
-            <p><small>Posted on {{.CreatedAt}}</small></p>
-
-            <!-- Comment Like & Dislike Form -->
-            <form class="like-form" action="/likes" method="POST">
-                <input type="hidden" name="id" value="{{.ID}}">
-                <input type="hidden" name="item_type" value="comment">
-                <button type="submit" name="type" value="like">
-                    👍 Like (<span id="like-count-comment-{{.ID}}">{{.Likes}}</span>)
-                </button>
-                <button type="submit" name="type" value="dislike">
-                    👎 Dislike (<span id="dislike-count-comment-{{.ID}}">{{.Dislikes}}</span>)
-                </button>
+                <button type="submit">Create Post</button>
             </form>
 
-
-        <!-- Comment Form for comments -->
-        <form action="/comments" method="POST" class="comment-form" id="comments-{{.ID}}">
-            <input type="hidden" name="comment_id" value="{{.ID}}">
-            <input type="text" name="content" placeholder="Add a comment">
-            <button type="submit">💬 Comment</button>
-        </form>
         </div>
-        {{end}}
+        <div class="posts-container">
+            {{range .Posts}}
+            <div class="post" data-post-id="{{.ID}}">
+                <h2>{{.Title}}</h2>
+                <p>{{.Content}}</p>
+                <p><small>by {{.Username}}</small></p>
 
-        <hr>
+                <div class="categories">
+                    Categories:
+                    {{range .Categories}}
+                    <span class="category-tag">{{.Name}}</span>
+                    {{end}}
+                </div>
+
+                {{if .Media}}
+                <div class="media-container">
+                    {{if or (eq .ContentType "image/jpeg") (eq .ContentType "image/png") (eq .ContentType "image/gif")}}
+                    <img src="data:{{.ContentType}};base64,{{.Media}}" alt="Post image" class="post-media">
+                    {{else if or (eq .ContentType "video/mp4") (eq .ContentType "video/quicktime") (eq .ContentType
+                    "video/webm")}}
+                    <video controls class="post-media">
+                        <source src="data:{{.ContentType}};base64,{{.Media}}" type="{{.ContentType}}">
+                        Your browser does not support the video tag.
+                    </video>
+                    {{end}}
+                </div>
+                {{end}}
+
+                <!-- Like & Dislike Buttons -->
+                <form class="like-form" action="/likes" method="POST">
+                    <input type="hidden" name="id" value="{{.ID}}">
+                    <input type="hidden" name="item_type" value="post">
+                    <button type="submit" name="type" value="like">
+                        👍<span id="like-count-post-{{.ID}}">{{.Likes}}</span>
+                    </button>
+                    <button type="submit" name="type" value="dislike">
+                        👎 <span id="dislike-count-post-{{.ID}}">{{.Dislikes}}</span>
+                    </button>
+                </form>
+
+                <!-- Comment Input -->
+                <form action="/comments" method="POST" class="comment-form">
+                    <input type="hidden" name="post_id" value="{{.ID}}">
+                    <input type="text" name="content" placeholder="Add a comment" required>
+                    <button type="submit">💬 Comment</button>
+                </form>
+
+                <!-- Comments Section with Recursive Nesting -->
+                {{range .Comments}}
+                <div class="comment" data-comment-id="{{.ID}}">
+                    <p>{{.Content}}</p>
+                    <p><small>Posted by {{.Username}} on {{.CreatedAt}}</small></p>
+
+                    <!-- Comment Like/Dislike -->
+                    <form class="like-form" action="/likes" method="POST">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="item_type" value="comment">
+                        <button type="submit" name="type" value="like">
+                            👍{{.Likes}}
+                        </button>
+                        <button type="submit" name="type" value="dislike">
+                            👎{{.Dislikes}}
+                        </button>
+                    </form>
+
+                    <!-- Reply to Comment -->
+                    <form action="/comments" method="POST" class="comment-form">
+                        <input type="hidden" name="post_id" value="{{$.ID}}">
+                        <input type="hidden" name="comment_id" value="{{.ID}}">
+                        <input type="text" name="content" placeholder="Reply to this comment" required>
+                        <button type="submit">💬 Reply</button>
+                    </form>
+
+                    <!-- Nested Replies Recursive Template -->
+                    {{with .Replies}}
+                    {{template "nested-replies" (dict "Replies" . "PostID" $.ID)}}
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+
+            <!-- Nested Replies Template Definition -->
+            {{define "nested-replies"}}
+            {{range .Replies}}
+            <div class="nested-comment">
+                <p>{{.Content}}</p>
+                <p><small>Replied by {{.Username}} on {{.CreatedAt}}</small></p>
+
+                <!-- Nested Comment Like/Dislike -->
+                <form class="like-form" action="/likes" method="POST">
+                    <input type="hidden" name="id" value="{{.ID}}">
+                    <input type="hidden" name="item_type" value="comment">
+                    <button type="submit" name="type" value="like">
+                        👍 {{.Likes}}
+                    </button>
+                    <button type="submit" name="type" value="dislike">
+                        👎 {{.Dislikes}}
+                    </button>
+                </form>
+
+                <!-- Reply to Nested Comment -->
+                <form action="/comments" method="POST" class="comment-form">
+                    <input type="hidden" name="post_id" value="{{.PostID}}">
+                    <input type="hidden" name="comment_id" value="{{.ID}}">
+                    <input type="text" name="content" placeholder="Reply to this comment" required>
+                    <button type="submit">💬 Reply</button>
+                </form>
+
+                <!-- Recursively render deeper nested replies -->
+                {{if .Replies}}
+                {{template "nested-replies" (dict "Replies" .Replies "PostID" .PostID)}}
+                {{end}}
+            </div>
+            {{end}}
+            {{end}}
+
+            <!-- Custom function to create a dictionary -->
+            {{define "dict"}}
+            {{if eq (len .) 2}}
+            {{with $key := index . 0}}
+            {{with $value := index . 1}}
+            {{$result := dict $key $value}}
+            {{$result}}
+            {{end}}
+            {{end}}
+            {{else if eq (len .) 3}}
+            {{with $key1 := index . 0}}
+            {{with $key2 := index . 1}}
+            {{with $value1 := index . 2}}
+            {{$result := dict $key1 $value1 $key2 $value1}}
+            {{$result}}
+            {{end}}
+            {{end}}
+            {{end}}
+            {{end}}
+            {{end}}
+            <!-- <hr> -->
+        </div>
+        <div class="filters-container">
+            <label for="categories">Categories:</label>
+            <div class="category-group">
+                {{range .Categories}}
+                <div class="category-option">
+                    <input type="checkbox" id="cat-{{.ID}}" name="categories" value="{{.ID}}">
+                    <label for="cat-{{.ID}}">{{.Name}}</label>
+                </div>
+                {{end}}
+            </div>
+            <button type="submit" >Filter Posts</button>
+        </div>
     </div>
-    {{end}}
-    <hr>
-
     <script>
 
         // Handle post creation form submission
@@ -175,14 +211,26 @@
 
         // Handle like/dislike form submissions
         // Like/dislike handler for both posts and comments
+        // Like/dislike handler for posts, comments, and nested replies
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.like-form').forEach(form => {
                 form.addEventListener('submit', async (event) => {
                     event.preventDefault();
 
                     const formData = new URLSearchParams();
-                    formData.append('id', event.target.querySelector('input[name="id"]').value);
-                    formData.append('item_type', event.target.querySelector('input[name="item_type"]').value);
+
+                    // Get common form data
+                    const idInput = event.target.querySelector('input[name="id"]');
+                    const itemTypeInput = event.target.querySelector('input[name="item_type"]');
+
+                    // Sanity checks to ensure required inputs exist
+                    if (!idInput || !itemTypeInput) {
+                        console.error('Missing required form inputs');
+                        return;
+                    }
+
+                    formData.append('id', idInput.value);
+                    formData.append('item_type', itemTypeInput.value);
                     formData.append('type', event.submitter.value);
 
                     try {
@@ -195,15 +243,32 @@
                         });
 
                         if (response.ok) {
-                            //error handling for easy debugging of the code
-                            const itemType = event.target.querySelector('input[name="item_type"]').value;
-                            const itemId = event.target.querySelector('input[name="id"]').value;
-                            const countSpan = document.getElementById(`${event.submitter.value}-count-${itemType}-${itemId}`);
+                            // Determine the correct count span for different scenarios
+                            let countSpan = null;
+                            const itemType = itemTypeInput.value;
+                            const itemId = idInput.value;
+
+                            // Try to find count span for posts first
+                            countSpan = document.getElementById(`${event.submitter.value}-count-${itemType}-${itemId}`);
+
+                            // If not found, try to find the nearest parent comment's like/dislike span
+                            if (!countSpan) {
+                                const parentCommentDiv = event.target.closest('.comment, .nested-comment');
+                                if (parentCommentDiv) {
+                                    const nearestCountSpan = parentCommentDiv.querySelector(
+                                        `[id$="-count-${itemType}-${itemId}"]`
+                                    );
+                                    countSpan = nearestCountSpan;
+                                }
+                            }
 
                             if (countSpan) {
-                                const currentCount = parseInt(countSpan.textContent);
-                                // countSpan.textContent = currentCount + 1;
-                                window.location.reload()
+
+                                alert('Like/Dislike processed successfully');
+                                window.location.reload();
+                            } else {
+                                console.warn('No count span found for this like/dislike');
+                                window.location.reload();
                             }
                         } else if (response.status === 401) {
                             window.location.href = '/login';

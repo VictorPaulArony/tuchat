@@ -86,84 +86,90 @@
               </select>
             </div>
           </div>
-        
 
-        <div id="posts-container" class="posts-list">
-          {{range .Posts}}
-          <div class="post">
-            <h2>{{.Title}}</h2>
-            <p>{{.Content}}</p>
-            <p><small>by {{.Username}}</small></p>
-            <!-- Display categories -->
-            <div class="categories">
-              Categories:
-              {{range .Categories}}
-              <span class="category-tag">{{.Name}}</span>
-              {{end}}
-            </div>
-            <!-- {{if .Media}}
+
+          <div id="posts-container" class="posts-list">
+            {{range .Posts}}
+            <div class="post">
+              <h2>{{.Title}}</h2>
+              <p>{{.Content}}</p>
+              <p><small>by {{.Username}}</small></p>
+              <!-- Display categories -->
+              <div class="categories">
+                Categories:
+                {{range .Categories}}
+                <span class="category-tag">{{.Name}}</span>
+                {{end}}
+              </div>
+              <!-- {{if .Media}}
         <img src="data:image/JPG;base64,{{.Media}}" alt="Post Media">
         {{end}} -->
-            {{if .Media}}
-            <div class="media-container">
-              {{if or (eq .ContentType "image/jpeg") (eq .ContentType "image/png") (eq .ContentType "image/gif")}}
-              <img src="data:{{.ContentType}};base64,{{.Media}}" alt="Post image" class="post-media">
-              {{else if or (eq .ContentType "video/mp4") (eq .ContentType "video/quicktime") (eq .ContentType
-              "video/webm")}}
-              <video controls class="post-media">
-                <source src="data:{{.ContentType}};base64,{{.Media}}" type="{{.ContentType}}">
-                Your browser does not support the video tag.
-              </video>
+              {{if .Media}}
+              <div class="media-container">
+                {{if or (eq .ContentType "image/jpeg") (eq .ContentType "image/png") (eq .ContentType "image/gif")}}
+                <img src="data:{{.ContentType}};base64,{{.Media}}" alt="Post image" class="post-media">
+                {{else if or (eq .ContentType "video/mp4") (eq .ContentType "video/quicktime") (eq .ContentType
+                "video/webm")}}
+                <video controls class="post-media">
+                  <source src="data:{{.ContentType}};base64,{{.Media}}" type="{{.ContentType}}">
+                  Your browser does not support the video tag.
+                </video>
+                {{end}}
+              </div>
               {{end}}
-            </div>
-            {{end}}
-            <p>{{.Category}}</p>
+              <p>{{.Category}}</p>
 
-            <!-- Like & Dislike Form -->
-            <form class="like-form" action="/likes" method="POST">
-              <input type="hidden" name="id" value="{{.ID}}">
-              <input type="hidden" name="item_type" value="post">
-              <button type="submit" name="type" value="like">
-                👍 Like (<span id="like-count-post-{{.ID}}">{{.Likes}}</span>)
-              </button>
-              <button type="submit" name="type" value="dislike">
-                👎 Dislike (<span id="dislike-count-post-{{.ID}}">{{.Dislikes}}</span>)
-              </button>
-            </form>
-
-            <!-- Comment Form -->
-            <form action="/comments" method="POST" class="comment-form" id="comments-{{.ID}}">
-              <input type="hidden" name="post_id" value="{{.ID}}">
-              <input type="text" name="content" placeholder="Add a comment">
-              <button type="submit">💬 Comment</button>
-            </form>
-
-            <!-- <p>Total Comments: <span id="comment-count-{{.ID}}">{{.Comments}}</span></p> -->
-            {{range .Comments}}
-            <div class="comment">
-              <p>{{.Content}}</p>
-              <p><small>Posted on {{.CreatedAt}}</small></p>
-
-              <!-- Comment Like & Dislike Form -->
+              <!-- Like & Dislike Form -->
               <form class="like-form" action="/likes" method="POST">
                 <input type="hidden" name="id" value="{{.ID}}">
-                <input type="hidden" name="item_type" value="comment">
+                <input type="hidden" name="item_type" value="post">
                 <button type="submit" name="type" value="like">
-                  👍 Like (<span id="like-count-comment-{{.ID}}">{{.Likes}}</span>)
+                  👍 Like (<span id="like-count-post-{{.ID}}">{{.Likes}}</span>)
                 </button>
                 <button type="submit" name="type" value="dislike">
-                  👎 Dislike (<span id="dislike-count-comment-{{.ID}}">{{.Dislikes}}</span>)
+                  👎 Dislike (<span id="dislike-count-post-{{.ID}}">{{.Dislikes}}</span>)
                 </button>
               </form>
+
+              <!-- Comment Form -->
+              <form action="/comments" method="POST" class="comment-form" id="comments-{{.ID}}">
+                <input type="hidden" name="post_id" value="{{.ID}}">
+                <input type="text" name="content" placeholder="Add a comment">
+                <button type="submit">💬 Comment</button>
+              </form>
+
+              <!-- <p>Total Comments: <span id="comment-count-{{.ID}}">{{.Comments}}</span></p> -->
+              {{range .Comments}}
+              <div class="comment">
+                <p>{{.Content}}</p>
+                <p><small>Posted on {{.CreatedAt}}</small></p>
+
+                <!-- Comment Like & Dislike Form -->
+                <form class="like-form" action="/likes" method="POST">
+                  <input type="hidden" name="id" value="{{.ID}}">
+                  <input type="hidden" name="item_type" value="comment">
+                  <button type="submit" name="type" value="like">
+                    👍 Like (<span id="like-count-comment-{{.ID}}">{{.Likes}}</span>)
+                  </button>
+                  <button type="submit" name="type" value="dislike">
+                    👎 Dislike (<span id="dislike-count-comment-{{.ID}}">{{.Dislikes}}</span>)
+                  </button>
+                </form>
+                <!-- Comment Form for comments -->
+                <form action="/comments" method="POST" class="comment-form" id="comments-{{.ID}}">
+                  <input type="hidden" name="comment_id" value="{{.ID}}">
+                  <input type="text" name="content" placeholder="Add a comment">
+                  <button type="submit">💬 Comment</button>
+                </form>
+              </div>
+              {{end}}
+
+              <hr>
             </div>
             {{end}}
-
             <hr>
           </div>
-          {{end}}
-          <hr>
         </div>
-      </div>
 
         <div class="sidebar-right">
           <div class="filter-section">
@@ -210,36 +216,6 @@
             </form>
           </div>
           <hr>
-
-          <div class="suggestions-section">
-            <h4>Suggested for You</h4>
-            <div class="suggested-profiles">
-              <div class="suggested-profile">
-                <img src="https://randomuser.me/api/portraits/women/50.jpg" class="rounded-circle">
-                <div class="profile-info">
-                  <strong>Sarah Thompson</strong>
-                  <span>Travel Photographer</span>
-                </div>
-                <button class="btn btn-sm btn-outline-primary">Follow</button>
-              </div>
-              <div class="suggested-profile">
-                <img src="https://randomuser.me/api/portraits/men/55.jpg" class="rounded-circle">
-                <div class="profile-info">
-                  <strong>Michael Roberts</strong>
-                  <span>Food Blogger</span>
-                </div>
-                <button class="btn btn-sm btn-outline-primary">Follow</button>
-              </div>
-              <div class="suggested-profile">
-                <img src="https://randomuser.me/api/portraits/women/60.jpg" class="rounded-circle">
-                <div class="profile-info">
-                  <strong>Emma Davis</strong>
-                  <span>Lifestyle Influencer</span>
-                </div>
-                <button class="btn btn-sm btn-outline-primary">Follow</button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
