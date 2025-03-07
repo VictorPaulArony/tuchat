@@ -13,54 +13,267 @@ import (
 var DB *sql.DB
 
 // Display posts
-func RenderPostsPage(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		// First, get all categories for the dropdown
-		var categories []struct {
+func RenderPostsPage() interface{} {
+	// if r.Method == http.MethodGet {
+	// First, get all categories for the dropdown
+	var categories []struct {
+		ID   string
+		Name string
+	}
+	categoryRows, err := DB.Query("SELECT id, name FROM categories ORDER BY name")
+	if err != nil {
+		log.Println("Failed to load categories", http.StatusInternalServerError)
+		return nil
+	}
+	defer categoryRows.Close()
+
+	for categoryRows.Next() {
+		var cat struct {
 			ID   string
 			Name string
 		}
-		categoryRows, err := DB.Query("SELECT id, name FROM categories ORDER BY name")
-		if err != nil {
-			http.Error(w, "Failed to load categories", http.StatusInternalServerError)
-			return
+		if err := categoryRows.Scan(&cat.ID, &cat.Name); err != nil {
+			continue
 		}
-		defer categoryRows.Close()
+		categories = append(categories, cat)
+	}
 
-		for categoryRows.Next() {
-			var cat struct {
-				ID   string
-				Name string
-			}
-			if err := categoryRows.Scan(&cat.ID, &cat.Name); err != nil {
-				continue
-			}
-			categories = append(categories, cat)
-		}
-
-		// Get all posts with their details and username
-		rows, err := DB.Query(`
+	// Get all posts with their details and username
+	rows, err := DB.Query(`
             SELECT p.id, u.username, p.title, p.content, p.media, p.content_type, p.created_at 
             FROM posts p 
             JOIN users u ON p.user_id = u.id
+			ORDER BY p.created_at DESC 
         `)
+	if err != nil {
+		fmt.Println(err)
+		log.Println("Failed to load posts", http.StatusInternalServerError)
+		return nil
+	}
+	defer rows.Close()
+
+	var posts []map[string]interface{}
+	for rows.Next() {
+		var id, username, title, content, contentType string
+		var createdAt time.Time
+		var media []byte
+
+		if err := rows.Scan(&id, &username, &title, &content, &media, &contentType, &createdAt); err != nil {
+			log.Println("Failed to parse posts", http.StatusInternalServerError)
+			fmt.Println(err)
+			return nil
+		}
+
+		// Convert media to base64 if it exists
+		var mediaBase64 string
+		if len(media) > 0 {
+			mediaBase64 = base64.StdEncoding.EncodeToString(media)
+		}
+
+		// Fetch categories for this post
+		categoryRows, err := DB.Query(`
+                SELECT c.id, c.name 
+                FROM categories c 
+                JOIN post_categories pc ON c.id = pc.category_id 
+                WHERE pc.post_id = ?`, id)
+		if err != nil {
+			log.Println("Failed to fetch post categories", http.StatusInternalServerError)
+			return nil
+		}
+		defer categoryRows.Close()
+
+		var postCategories []map[string]string
+		for categoryRows.Next() {
+			var catID, catName string
+			if err := categoryRows.Scan(&catID, &catName); err != nil {
+				continue
+			}
+			postCategories = append(postCategories, map[string]string{
+				"ID":   catID,
+				"Name": catName,
+			})
+		}
+
+		// Fetch likes and dislikes
+		var likes, dislikes int
+		err = DB.QueryRow("SELECT COUNT(*) FROM post_likes WHERE post_id = ? AND type = 'like'", id).Scan(&likes)
+		if err != nil {
+			log.Println("Failed to fetch likes", http.StatusInternalServerError)
+			return nil
+		}
+
+		err = DB.QueryRow("SELECT COUNT(*) FROM post_likes WHERE post_id = ? AND type = 'dislike'", id).Scan(&dislikes)
+		if err != nil {
+			log.Println("Failed to fetch dislikes", http.StatusInternalServerError)
+			return nil
+		}
+
+		// Fetch top-level comments with nested comments
+		comments, err := fetchNestedComments(id)
+		if err != nil {
+			log.Println("Failed to fetch comments", http.StatusInternalServerError)
+			return nil
+		}
+
+		posts = append(posts, map[string]interface{}{
+			"ID":          id,
+			"Title":       title,
+			"Content":     content,
+			"Likes":       likes,
+			"Dislikes":    dislikes,
+			"Comments":    comments,
+			"Username":    username,
+			"Categories":  postCategories,
+			"Media":       mediaBase64,
+			"ContentType": contentType,
+			"CreatedAt":   createdAt,
+		})
+	}
+
+	data := map[string]interface{}{
+		"Posts":      posts,
+		"Categories": categories,
+	}
+
+	return data
+	// }
+}
+
+// fetchNestedComments retrieves top-level comments and their nested replies
+func fetchNestedComments(postID string) ([]map[string]interface{}, error) {
+	// Recursive function to fetch nested comments with unlimited depth
+	var fetchCommentReplies func(parentCommentID string) ([]map[string]interface{}, error)
+	fetchCommentReplies = func(parentCommentID string) ([]map[string]interface{}, error) {
+		// Fetch comments/replies with their details
+		commentRows, err := DB.Query(`
+            SELECT c.id, c.content, c.created_at,
+            (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'like') as likes,
+            (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'dislike') as dislikes,
+            u.username
+            FROM comments c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.parent_id = ?
+            ORDER BY c.created_at ASC`, parentCommentID)
+		if err != nil {
+			return nil, err
+		}
+		defer commentRows.Close()
+
+		var comments []map[string]interface{}
+		for commentRows.Next() {
+			var commentID, commentContent, username string
+			var commentCreatedAt time.Time
+			var commentLikes, commentDislikes int
+
+			err := commentRows.Scan(&commentID, &commentContent, &commentCreatedAt, &commentLikes, &commentDislikes, &username)
+			if err != nil {
+				return nil, err
+			}
+
+			// Recursively fetch nested replies for this comment
+			nestedReplies, err := fetchCommentReplies(commentID)
+			if err != nil {
+				return nil, err
+			}
+
+			comments = append(comments, map[string]interface{}{
+				"ID":        commentID,
+				"Content":   commentContent,
+				"CreatedAt": commentCreatedAt,
+				"Likes":     commentLikes,
+				"Dislikes":  commentDislikes,
+				"Username":  username,
+				"Replies":   nestedReplies,
+			})
+		}
+
+		return comments, nil
+	}
+
+	// Fetch top-level comments
+	commentRows, err := DB.Query(`
+        SELECT c.id, c.content, c.created_at,
+        (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'like') as likes,
+        (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'dislike') as dislikes,
+        u.username
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.post_id = ? AND c.parent_id IS NULL
+        ORDER BY c.created_at DESC`, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer commentRows.Close()
+
+	var comments []map[string]interface{}
+	for commentRows.Next() {
+		var commentID, commentContent, username string
+		var commentCreatedAt time.Time
+		var commentLikes, commentDislikes int
+
+		err := commentRows.Scan(&commentID, &commentContent, &commentCreatedAt, &commentLikes, &commentDislikes, &username)
+		if err != nil {
+			return nil, err
+		}
+
+		// Fetch nested replies for this comment using the recursive function
+		nestedReplies, err := fetchCommentReplies(commentID)
+		if err != nil {
+			return nil, err
+		}
+
+		comments = append(comments, map[string]interface{}{
+			"ID":        commentID,
+			"Content":   commentContent,
+			"CreatedAt": commentCreatedAt,
+			"Likes":     commentLikes,
+			"Dislikes":  commentDislikes,
+			"Username":  username,
+			"Replies":   nestedReplies,
+		})
+	}
+
+	return comments, nil
+}
+
+// function to handle the filters
+func FilterPost(categories []string) interface{} {
+	var posts []map[string]interface{}
+	for _, category := range categories {
+
+		var id string
+		query := `
+	  SELECT  pc.post_id
+	  FROM post_categories pc
+	  WHERE pc.category_id = ?
+		`
+		postID := DB.QueryRow(query, category).Scan(&id)
+
+		// Get all posts with their details and username
+		post, err := DB.Query(`
+            SELECT p.id, u.username, p.title, p.content, p.media, p.content_type, p.created_at 
+            FROM posts p 
+            JOIN users u ON p.user_id = u.id
+			ORDER BY p.created_at DESC 
+			WHERE p.id = ?
+        `, postID)
 		if err != nil {
 			fmt.Println(err)
-			http.Error(w, "Failed to load posts", http.StatusInternalServerError)
-			return
+			log.Println("Failed to load posts", http.StatusInternalServerError)
+			return nil
 		}
-		defer rows.Close()
+		defer post.Close()
 
-		var posts []map[string]interface{}
-		for rows.Next() {
+		
+		for post.Next() {
 			var id, username, title, content, contentType string
 			var createdAt time.Time
 			var media []byte
 
-			if err := rows.Scan(&id, &username, &title, &content, &media, &contentType, &createdAt); err != nil {
-				http.Error(w, "Failed to parse posts", http.StatusInternalServerError)
+			if err := post.Scan(&id, &username, &title, &content, &media, &contentType, &createdAt); err != nil {
+				log.Println("Failed to parse posts", http.StatusInternalServerError)
 				fmt.Println(err)
-				return
+				return nil
 			}
 
 			// Convert media to base64 if it exists
@@ -76,8 +289,8 @@ func RenderPostsPage(w http.ResponseWriter, r *http.Request) {
                 JOIN post_categories pc ON c.id = pc.category_id 
                 WHERE pc.post_id = ?`, id)
 			if err != nil {
-				http.Error(w, "Failed to fetch post categories", http.StatusInternalServerError)
-				return
+				log.Println("Failed to fetch post categories", http.StatusInternalServerError)
+				return nil
 			}
 			defer categoryRows.Close()
 
@@ -97,21 +310,21 @@ func RenderPostsPage(w http.ResponseWriter, r *http.Request) {
 			var likes, dislikes int
 			err = DB.QueryRow("SELECT COUNT(*) FROM post_likes WHERE post_id = ? AND type = 'like'", id).Scan(&likes)
 			if err != nil {
-				http.Error(w, "Failed to fetch likes", http.StatusInternalServerError)
-				return
+				log.Println("Failed to fetch likes", http.StatusInternalServerError)
+				return nil
 			}
 
 			err = DB.QueryRow("SELECT COUNT(*) FROM post_likes WHERE post_id = ? AND type = 'dislike'", id).Scan(&dislikes)
 			if err != nil {
-				http.Error(w, "Failed to fetch dislikes", http.StatusInternalServerError)
-				return
+				log.Println("Failed to fetch dislikes", http.StatusInternalServerError)
+				return nil
 			}
 
 			// Fetch top-level comments with nested comments
 			comments, err := fetchNestedComments(id)
 			if err != nil {
-				http.Error(w, "Failed to fetch comments", http.StatusInternalServerError)
-				return
+				log.Println("Failed to fetch comments", http.StatusInternalServerError)
+				return nil
 			}
 
 			posts = append(posts, map[string]interface{}{
@@ -128,113 +341,12 @@ func RenderPostsPage(w http.ResponseWriter, r *http.Request) {
 				"CreatedAt":   createdAt,
 			})
 		}
-
-		data := map[string]interface{}{
-			"Posts":      posts,
-			"Categories": categories,
-		}
-
-		RenderTemplates(w, "posts.html", data)
 	}
+	data := map[string]interface{}{
+		"Posts":      posts,
+	}
+	return data
 }
-
-// fetchNestedComments retrieves top-level comments and their nested replies
-func fetchNestedComments(postID string) ([]map[string]interface{}, error) {
-    // Recursive function to fetch nested comments with unlimited depth
-    var fetchCommentReplies func(parentCommentID string) ([]map[string]interface{}, error)
-    fetchCommentReplies = func(parentCommentID string) ([]map[string]interface{}, error) {
-        // Fetch comments/replies with their details
-        commentRows, err := DB.Query(`
-            SELECT c.id, c.content, c.created_at,
-            (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'like') as likes,
-            (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'dislike') as dislikes,
-            u.username
-            FROM comments c
-            JOIN users u ON c.user_id = u.id
-            WHERE c.parent_id = ?
-            ORDER BY c.created_at ASC`, parentCommentID)
-        if err != nil {
-            return nil, err
-        }
-        defer commentRows.Close()
-
-        var comments []map[string]interface{}
-        for commentRows.Next() {
-            var commentID, commentContent, username string
-            var commentCreatedAt time.Time
-            var commentLikes, commentDislikes int
-
-            err := commentRows.Scan(&commentID, &commentContent, &commentCreatedAt, &commentLikes, &commentDislikes, &username)
-            if err != nil {
-                return nil, err
-            }
-
-            // Recursively fetch nested replies for this comment
-            nestedReplies, err := fetchCommentReplies(commentID)
-            if err != nil {
-                return nil, err
-            }
-
-            comments = append(comments, map[string]interface{}{
-                "ID":        commentID,
-                "Content":   commentContent,
-                "CreatedAt": commentCreatedAt,
-                "Likes":     commentLikes,
-                "Dislikes":  commentDislikes,
-                "Username":  username,
-                "Replies":   nestedReplies,
-            })
-        }
-
-        return comments, nil
-    }
-
-    // Fetch top-level comments 
-    commentRows, err := DB.Query(`
-        SELECT c.id, c.content, c.created_at,
-        (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'like') as likes,
-        (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND type = 'dislike') as dislikes,
-        u.username
-        FROM comments c
-        JOIN users u ON c.user_id = u.id
-        WHERE c.post_id = ? AND c.parent_id IS NULL
-        ORDER BY c.created_at DESC`, postID)
-    if err != nil {
-        return nil, err
-    }
-    defer commentRows.Close()
-
-    var comments []map[string]interface{}
-    for commentRows.Next() {
-        var commentID, commentContent, username string
-        var commentCreatedAt time.Time
-        var commentLikes, commentDislikes int
-
-        err := commentRows.Scan(&commentID, &commentContent, &commentCreatedAt, &commentLikes, &commentDislikes, &username)
-        if err != nil {
-            return nil, err
-        }
-
-        // Fetch nested replies for this comment using the recursive function
-        nestedReplies, err := fetchCommentReplies(commentID)
-        if err != nil {
-            return nil, err
-        }
-
-        comments = append(comments, map[string]interface{}{
-            "ID":        commentID,
-            "Content":   commentContent,
-            "CreatedAt": commentCreatedAt,
-            "Likes":     commentLikes,
-            "Dislikes":  commentDislikes,
-            "Username":  username,
-            "Replies":   nestedReplies,
-        })
-    }
-
-    return comments, nil
-}
-
 
 // function to render the html templates pages
 func RenderTemplates(w http.ResponseWriter, fileName string, data interface{}) {
@@ -251,18 +363,27 @@ func HomePageHandler(w http.ResponseWriter, r *http.Request) {
 		ErrorHandler(w, http.StatusNotFound)
 	}
 	if r.Method == http.MethodGet {
-		RenderTemplates(w, "posts.html", nil)
+		data := RenderPostsPage()
+		RenderTemplates(w, "posts.html", data)
 		return
 	}
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Method Not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 
+		categories := r.Form["categories"]
+		data := FilterPost(categories)
+
+		RenderTemplates(w, "base.html", data)
+	}
 	// fmt.Println(posts)
-
-	RenderTemplates(w, "base.html", nil)
 }
 
 // function to handle the Errors in the system
 func ErrorHandler(w http.ResponseWriter, code int) {
-	w.WriteHeader(code)
+	// w.WriteHeader(code)
 	temp, err := template.ParseFiles("templates/error.html")
 	if err != nil {
 		log.Println("Error while parsing the error page:", err)
@@ -297,26 +418,26 @@ func InitTemplates(templateDir string) {
 	// 	},
 	// 	// Add any other helper functions you need here
 	// }
-    funcMap := template.FuncMap{
-        "dict": func(values ...interface{}) map[string]interface{} {
-            if len(values)%2 != 0 {
-                return nil
-            }
-            dict := make(map[string]interface{}, len(values)/2)
-            for i := 0; i < len(values); i += 2 {
-                key, ok := values[i].(string)
-                if !ok {
-                    return nil
-                }
-                dict[key] = values[i+1]
-            }
-            return dict
-        },
-    }
-    
+	funcMap := template.FuncMap{
+		"dict": func(values ...interface{}) map[string]interface{} {
+			if len(values)%2 != 0 {
+				return nil
+			}
+			dict := make(map[string]interface{}, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				key, ok := values[i].(string)
+				if !ok {
+					return nil
+				}
+				dict[key] = values[i+1]
+			}
+			return dict
+		},
+	}
+
 	var err error
-    // tmpl := template.New("posts.html").Funcs(funcMap)
-    // tmpl, err = tmpl.ParseFiles("posts.html")
+	// tmpl := template.New("posts.html").Funcs(funcMap)
+	// tmpl, err = tmpl.ParseFiles("posts.html")
 
 	// Create a new template and register the FuncMap
 	templates = template.New("")
