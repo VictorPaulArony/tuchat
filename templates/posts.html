@@ -176,16 +176,18 @@
             <!-- <hr> -->
         </div>
         <div class="filters-container">
-            <label for="categories">Categories:</label>
-            <div class="category-group">
-                {{range .Categories}}
-                <div class="category-option">
-                    <input type="checkbox" id="cat-{{.ID}}" name="categories" value="{{.ID}}">
-                    <label for="cat-{{.ID}}">{{.Name}}</label>
+            <form action="/filter" method="POST">
+                <label for="categories">Categories:</label>
+                <div class="category-group">
+                    {{range .Categories}}
+                    <div class="category-option">
+                        <input type="checkbox" id="cat-{{.ID}}" name="categories" value="{{.ID}}">
+                        <label for="cat-{{.ID}}">{{.Name}}</label>
+                    </div>
+                    {{end}}
                 </div>
-                {{end}}
-            </div>
-            <button type="submit" >Filter Posts</button>
+                <button type="submit">Filter Posts</button>
+            </form>
         </div>
     </div>
     <script>

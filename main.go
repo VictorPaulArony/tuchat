@@ -25,7 +25,7 @@ func main() {
 	http.HandleFunc("/create", handlers.CreatePostHandler)
 	http.HandleFunc("/comments", handlers.CreateCommentHandler)
 	http.HandleFunc("/likes", handlers.LikeHandler)
-	http.HandleFunc("/posts", handlers.RenderPostsPage)
+	// http.HandleFunc("/posts", handlers.RenderPostsPage)
 
 	log.Println("Server started at port: http://localhost:1234")
 	log.Fatal(http.ListenAndServe(":1234", nil))

@@ -49,7 +49,7 @@ func InitializeDataBase(databaseName string) (*sql.DB, error) {
 
 	CREATE TABLE IF NOT EXISTS comments(
 		id TEXT PRIMARY KEY,
-		post_id TEXT NOT NULL,
+		post_id TEXT,
 		user_id TEXT NOT NULL,
 		parent_id TEXT,
 		content TEXT NOT NULL,
