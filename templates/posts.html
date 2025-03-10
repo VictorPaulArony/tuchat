@@ -87,6 +87,7 @@
                 {{range .Comments}}
                 <div class="comment" data-comment-id="{{.ID}}">
                     <p>{{.Content}}</p>
+                    
                     <p><small>Posted by {{.Username}} on {{.CreatedAt}}</small></p>
 
                     <!-- Comment Like/Dislike -->
@@ -203,7 +204,8 @@
 
             if (response.ok) {
                 alert('Post created successfully!');
-                window.location.href = '/posts';
+                // window.location.href = '/posts';
+                window.location.reload();
             } else if (response.status === 401) {
                 alert('Failed to create post: user not logged in.');
             } else {
