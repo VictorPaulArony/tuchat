@@ -111,6 +111,7 @@ func RenderPostsPage() interface{} {
 		// Fetch top-level comments with nested comments
 		comments, err := fetchNestedComments(id)
 		if err != nil {
+			fmt.Println("err", err)
 			log.Println("Failed to fetch comments", http.StatusInternalServerError)
 			return nil
 		}
@@ -243,20 +244,24 @@ func FilterPost(categories []string) interface{} {
 
 		var id string
 		query := `
-	  SELECT  pc.post_id
-	  FROM post_categories pc
-	  WHERE pc.category_id = ?
+	  		SELECT  pc.post_id
+	  		FROM post_categories pc
+	  		WHERE pc.category_id = ?
 		`
-		postID := DB.QueryRow(query, category).Scan(&id)
+		err := DB.QueryRow(query, category).Scan(&id)
+		if err != nil {
+			fmt.Println(err)
+			log.Println("Failed to load post id", http.StatusInternalServerError)
+			return nil
+		}
 
 		// Get all posts with their details and username
 		post, err := DB.Query(`
             SELECT p.id, u.username, p.title, p.content, p.media, p.content_type, p.created_at 
             FROM posts p 
-            JOIN users u ON p.user_id = u.id
-			ORDER BY p.created_at DESC 
+            JOIN users u ON p.user_id = u.id 
 			WHERE p.id = ?
-        `, postID)
+        `, id)
 		if err != nil {
 			fmt.Println(err)
 			log.Println("Failed to load posts", http.StatusInternalServerError)
@@ -264,7 +269,6 @@ func FilterPost(categories []string) interface{} {
 		}
 		defer post.Close()
 
-		
 		for post.Next() {
 			var id, username, title, content, contentType string
 			var createdAt time.Time
@@ -323,6 +327,7 @@ func FilterPost(categories []string) interface{} {
 			// Fetch top-level comments with nested comments
 			comments, err := fetchNestedComments(id)
 			if err != nil {
+				fmt.Println("err", err)
 				log.Println("Failed to fetch comments", http.StatusInternalServerError)
 				return nil
 			}
@@ -343,7 +348,7 @@ func FilterPost(categories []string) interface{} {
 		}
 	}
 	data := map[string]interface{}{
-		"Posts":      posts,
+		"Posts": posts,
 	}
 	return data
 }
@@ -359,9 +364,9 @@ func RenderTemplates(w http.ResponseWriter, fileName string, data interface{}) {
 
 // function to handle the get method  of the home page
 func HomePageHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		ErrorHandler(w, http.StatusNotFound)
-	}
+	// if r.URL.Path != "/" {
+	// 	ErrorHandler(w, http.StatusNotFound)
+	// }
 	if r.Method == http.MethodGet {
 		data := RenderPostsPage()
 		RenderTemplates(w, "posts.html", data)
@@ -376,7 +381,7 @@ func HomePageHandler(w http.ResponseWriter, r *http.Request) {
 		categories := r.Form["categories"]
 		data := FilterPost(categories)
 
-		RenderTemplates(w, "base.html", data)
+		RenderTemplates(w, "posts.html", data)
 	}
 	// fmt.Println(posts)
 }
